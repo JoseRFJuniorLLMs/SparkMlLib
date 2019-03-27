@@ -4,16 +4,15 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.Metadata;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import static org.apache.spark.sql.functions.split;
+import static org.apache.spark.sql.functions.when;
+import static org.apache.spark.sql.functions.col;
+
 
 @SpringBootApplication
 public class MlApplication implements CommandLineRunner {
@@ -43,19 +42,32 @@ public class MlApplication implements CommandLineRunner {
 				.withColumn("col3", split(cancerDataset.col("value"), "\\,").getItem(2));
 		cancer.show();
 
-		
-		cancer = cancer.selectExpr("cast(col1 as int) col1", 
-                "col2", 
-                "cast(col3 as int) col3");
+		cancer = cancer.selectExpr("cast(col1 as int) col1", "col2", "cast(col3 as int) col3");
 		cancer.show();
-		
+
 		cancer = cancer.filter(cancer.col("col1").$less("90"));
-		
-				//cast(DataTypes.IntegerType)).withColumn("col3", cancer.col("col3").cast(DataTypes.IntegerType));
-		
-				
+
+		// cast(DataTypes.IntegerType)).withColumn("col3",
+		// cancer.col("col3").cast(DataTypes.IntegerType));
+
+		System.out.println("Filter col1 with records more than 90");
 		cancer.show();
 		
+		cancer = cancer.withColumn("col2", when(col("col2").contains("0"), 0).when(col("col2").contains("III"), 3)
+				.when(col("col2").contains("II"), 2).when(col("col2").contains("I"), 1)
+				.when(col("col2").contains("IV"), 4).otherwise(5));
+		
+		System.out.println("Assigning int to col2");
+		cancer.show();
+		
+		System.out.println("Filter col3 with records more than 4");
+		
+		cancer = cancer.filter(cancer.col("col2").$less("5"));
+		cancer.show();
+
+		// .when(cancer.col("gender").equalTo("female"), 1)
+		// .otherwise(2));
+
 		// cancerDataset.withColumn("_tmp", split(cancerDataset.col("value"), "
 		// ")).select(
 		// cancerDataset.col("_tmp").getItem(0).as("col1"),
