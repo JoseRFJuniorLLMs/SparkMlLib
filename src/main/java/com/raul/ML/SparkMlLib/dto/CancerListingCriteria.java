@@ -1,0 +1,5 @@
+package com.raul.ML.SparkMlLib.dto;
+
+public enum CancerListingCriteria {
+	REGIONALNODESPOSITIVE,DERIVEDAJCCSTAGEGROUP,TUMORSIZE,AGE,SURVIVALMONTHS
+}

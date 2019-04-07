@@ -9,70 +9,82 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-import static org.apache.spark.sql.functions.split;
-import static org.apache.spark.sql.functions.when;
-import static org.apache.spark.sql.functions.col;
+import com.raul.ML.SparkMlLib.Analyzer.ClusterSurvivalRate;
+import com.raul.ML.SparkMlLib.clustering.IClusteringType;
+import com.raul.ML.SparkMlLib.config.ClusteringFactory;
+import com.raul.ML.SparkMlLib.converter.CancerDataPreProcessor;
+import com.raul.ML.SparkMlLib.converter.RowToVector;
 
+import scala.Tuple2;
+
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.mllib.linalg.Vector;
+
+import java.io.Serializable;
+
+import java.util.List;
 
 @SpringBootApplication
-public class MlApplication implements CommandLineRunner {
+public class MlApplication implements CommandLineRunner, Serializable {
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+
 	@Autowired
 	SparkSession sparkSession;
 
-	String cancerdata = "file:///Users/rahulgupta/eclipse-workspace/SparkMlLib/src/main/resources/cancerData/seer1.txt";
+	@Autowired
+	CancerDataPreProcessor cancerDataPreProcessor;
+
+	@Autowired
+	RowToVector rowToVector;
+
+	@Autowired
+	ClusterSurvivalRate clusterSurvivalRate;
+
+	@Autowired
+	ClusteringFactory clusteringFactory;
+
+	// private static final String PATH =
+	// "file:///C:/Testing/dataset/p1";
+
+	String cancerdata = "file:///C:/Testing/dataset/seer5Params.txt";
 
 	public static void main(String[] args) {
-		System.out.println("Starting!!!");
 		SpringApplication.run(MlApplication.class, args);
-		System.out.println("Ending!!!");
 	}
 
 	public void run(String... args) throws Exception {
 		// TODO Auto-generated method stub
-		System.out.println("Inside Run!!!");
-		sparkSession.sparkContext().conf().setAppName("RaulSparkTesting");
-		Dataset<String> cancerDataset = sparkSession.read().textFile(cancerdata).as(Encoders.STRING());
 
-		System.out.println(cancerDataset.count());
+		sparkSession.sparkContext().conf().setAppName("CancerSurviavlRatePredictor");
+		Dataset<String> cancerRawset = sparkSession.read().textFile(cancerdata).as(Encoders.STRING());
 
-		cancerDataset.printSchema();
+		Dataset<Row> cancerDataset = cancerDataPreProcessor.preProcessor(cancerRawset);
 
-		Dataset<Row> cancer = cancerDataset.withColumn("col1", split(cancerDataset.col("value"), "\\,").getItem(0))
-				.withColumn("col2", split(cancerDataset.col("value"), "\\,").getItem(1))
-				.withColumn("col3", split(cancerDataset.col("value"), "\\,").getItem(2));
-		cancer.show();
+		// cancerDataset.toJavaRDD().saveAsTextFile(PATH);
 
-		cancer = cancer.selectExpr("cast(col1 as int) col1", "col2", "cast(col3 as int) col3");
-		cancer.show();
+		JavaRDD<Vector> data = rowToVector.RDDmapper(cancerDataset);
 
-		cancer = cancer.filter(cancer.col("col1").$less("90"));
+		data.cache(); // data` should be cached for high performance, because this is an iterative
+						// algorithm.
 
-		// cast(DataTypes.IntegerType)).withColumn("col3",
-		// cancer.col("col3").cast(DataTypes.IntegerType));
+		// int numClusters = 6;
+		int numIterations = 30;
 
-		System.out.println("Filter col1 with records more than 90");
-		cancer.show();
-		
-		cancer = cancer.withColumn("col2", when(col("col2").contains("0"), 0).when(col("col2").contains("III"), 3)
-				.when(col("col2").contains("II"), 2).when(col("col2").contains("I"), 1)
-				.when(col("col2").contains("IV"), 4).otherwise(5));
-		
-		System.out.println("Assigning int to col2");
-		cancer.show();
-		
-		System.out.println("Filter col3 with records more than 4");
-		
-		cancer = cancer.filter(cancer.col("col2").$less("5"));
-		cancer.show();
+		IClusteringType driver = clusteringFactory.get("BIKMEANS");
 
-		// .when(cancer.col("gender").equalTo("female"), 1)
-		// .otherwise(2));
+		// Rely on concrete subclasses for this method.
+		for (int i = 6; i < 13; i++) {
+			Tuple2<JavaRDD<Integer>, Vector[]> pair = driver.dataCenters(data, i, numIterations);
+			JavaRDD<Integer> clusterIndexes = pair._1();
 
-		// cancerDataset.withColumn("_tmp", split(cancerDataset.col("value"), "
-		// ")).select(
-		// cancerDataset.col("_tmp").getItem(0).as("col1"),
-		// cancerDataset.col("_tmp").getItem(1).as("col2"),
-		// cancerDataset.col("_tmp").getItem(2).as("col3"));
-		cancer.printSchema();
+			// Bring all data to driver node for displaying results.
+			List<Row> collectedTempData = cancerDataset.collectAsList();
+			List<Integer> collectedClusterIndexes = clusterIndexes.collect();
+			clusterSurvivalRate.survivalRateCal(collectedTempData, collectedClusterIndexes);
+		}
 	}
+
 }

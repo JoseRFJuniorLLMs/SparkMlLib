@@ -2,6 +2,13 @@ package com.raul.ML.SparkMlLib.config;
 
 import org.springframework.context.annotation.Configuration;
 
+import com.raul.ML.SparkMlLib.Analyzer.ClusterSurvivalRate;
+import com.raul.ML.SparkMlLib.clustering.BiKMeansClustering;
+import com.raul.ML.SparkMlLib.clustering.GMMClustering;
+import com.raul.ML.SparkMlLib.clustering.KMeansClustering;
+import com.raul.ML.SparkMlLib.converter.CancerDataPreProcessor;
+import com.raul.ML.SparkMlLib.converter.RowToVector;
+import com.raul.ML.SparkMlLib.model.DataWriter;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
@@ -30,5 +37,48 @@ public class BeanConfig {
 		return sparkSession.sparkContext().hadoopConfiguration();
 	}
 	
+	@Bean
+	public CancerDataPreProcessor cancerDataPreProcessor() {
+		return new CancerDataPreProcessor();	
+	}
 	
+	@Bean
+	public RowToVector rowToVector()
+	{
+		return new RowToVector();
+	}
+	
+	@Bean
+	public DataWriter dataWriter() {
+		return new DataWriter();
+	}
+	
+	@Bean
+	public KMeansClustering kMeansClustering() {
+		return new KMeansClustering();
+	}
+	
+	@Bean
+	public GMMClustering gmmClustering()
+	{
+		return new GMMClustering();
+	}
+	
+	@Bean
+	public BiKMeansClustering biKMeansClustering()
+	{
+		return new BiKMeansClustering();
+	}
+	
+	@Bean
+	public ClusterSurvivalRate clusterSurvivalRate()
+	{
+		return new ClusterSurvivalRate();
+	}
+	
+	@Bean
+	public ClusteringFactory clusteringFactory()
+	{
+		return new ClusteringFactory();
+	}
 }
